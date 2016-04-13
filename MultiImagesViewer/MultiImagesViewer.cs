@@ -47,6 +47,9 @@ class MultiImagesViewer : Form{
 	//表示画像のディレクトリパス
 	private string path_image_directory = "";
 
+	//ディレクトリ移動履歴用
+	private List<string> already_past_path_list;
+
 
 	////////////////////////////////////////////////////////////////////
 	//メソッド
@@ -100,6 +103,9 @@ class MultiImagesViewer : Form{
 		////////////////////////////////
 		//ウィンドウリサイズ時の挙動
 		this.Resize += new EventHandler(this.DoWhenResize);
+
+		//ディレクトリ移動履歴
+		this.already_past_path_list = new List<string>();
 
 	}//function
 
@@ -213,7 +219,7 @@ class MultiImagesViewer : Form{
 			string[] files = Directory.GetFiles(
 				@path_directory,
 				"*",
-				System.IO.SearchOption.AllDirectories
+				System.IO.SearchOption.TopDirectoryOnly
 			);
 
 			//画像だけ取り出す
@@ -254,13 +260,21 @@ class MultiImagesViewer : Form{
 		int      num_show_images,
 		int      now_showing_images_order
 	){
-		Debug.WriteLine("path_image_files.Length : " + path_image_files.Length);
-		Debug.WriteLine("現在の表示先頭位置" + now_showing_images_order);
+		//Debug.WriteLine("path_image_files.Length : " + path_image_files.Length);
+		//Debug.WriteLine("現在の表示先頭位置" + now_showing_images_order);
 
 		//ディレクトリ指定があれば
 		if(path_image_files.Length > 0){
 			//画像の枠の数だけ繰り返し処理
 			for(int i = 0; i < num_show_images; i++){
+				if(i+1 > path_image_files.Length){
+					//ディレクトリ内にある画像数が表示数よりも小さい場合はピクチャボックスを非表示
+					this.my_picture_boxes[i].Hide();
+					continue;
+				}else{
+					this.my_picture_boxes[i].Show();
+				}//if
+
 				//画像配列内での表示位置（配列のキーではなく、1から始まる「nページ目」という数字）
 				int order_to_show = now_showing_images_order + i;
 				//画像パス配列の要素数より大きくなったら（最後の画像が表示された次のループなら）、配列範囲内に戻す
@@ -269,10 +283,13 @@ class MultiImagesViewer : Form{
 				}//if
 
 				//ページ番号を配列のキーに変換
-				int order_to_sho_in_array = order_to_show - 1;
+				int order_to_show_in_array = order_to_show - 1;
+
+				Debug.WriteLine("path_image_files.Length" + path_image_files.Length);
+				Debug.WriteLine("order_to_show_in_array" + order_to_show_in_array);
 
 				//ロードすべき画像パス
-				string now_image_path_to_show = path_image_files[order_to_sho_in_array];
+				string now_image_path_to_show = path_image_files[order_to_show_in_array];
 				this.my_picture_boxes[i].Load(now_image_path_to_show);
 			}//for
 		}//if
@@ -293,6 +310,10 @@ class MultiImagesViewer : Form{
 		switch(e.KeyCode){
 			case Keys.Up:
 				input_key = "上";
+
+				//前のディレクトリに移動する
+				this.SearchPreviousDirectory(this.path_image_directory);
+
 				break;
 
 			case Keys.Right:
@@ -328,6 +349,10 @@ class MultiImagesViewer : Form{
 
 			case Keys.Down:
 				input_key = "下";
+
+				//次のディレクトリに移動する
+				this.SearchNextDirectory();
+
 				break;
 
 			default:
@@ -397,23 +422,9 @@ class MultiImagesViewer : Form{
 			dir_path_to_open  = Path.GetDirectoryName(@file_path_to_open);
 
 			//画像パスの配列を、ドラッグドロップされたファイルのディレクトリ内の画像一覧に更新
-			this.path_image_files = this.GetPathImageFiles(dir_path_to_open);
-			Debug.WriteLine(file_path_to_open);
-
-			//表示ページ位置を先頭に
-			this.now_showing_images_order = 1;
-
-			//画像割り当て
-			this.ApplyImages(
-				this.path_image_files,
-				this.num_show_images,
-				this.now_showing_images_order
+			this.moveShowingDirectory(
+				dir_path_to_open
 			);
-
-			//現在地表示テキストボックス更新
-			this.path_image_directory = dir_path_to_open;
-			this.Text = this.path_image_directory;
-
 		}//if
 
 	}//function
@@ -434,5 +445,277 @@ class MultiImagesViewer : Form{
 
 		//画像表示領域を初期化
 		this.InitiateImages(this.num_show_images);
+	}//function
+
+
+	//////////////////////////////////
+	/**
+	 * 前のディレクトリに移動する
+	 * 
+	 * @param  調査対象のディレクトリ
+	 */
+	private void SearchPreviousDirectory(
+		string temp_dir
+	){
+
+		//現在地の親ディレクトリにファイルの一覧（サブディレクトリ含む）を取得させ、自分の直前のファイルのディレクトリに移動する
+		DirectoryInfo parent_directory = Directory.GetParent(temp_dir); //ここは引数のディレクトリを指定
+		string[] parent_directories = Directory.GetDirectories(
+			parent_directory.ToString(),
+			"*",
+			System.IO.SearchOption.AllDirectories
+		);
+		Array.Sort(parent_directories);
+
+		//もし現在地が親階層で取得したディレクトリ一覧の先頭だったらさらに遡る
+		if(this.path_image_directory.Equals(parent_directories[0])){
+			//このメソッドを再帰的に実行 現在地フィールドは更新しない 引数を位置世代上の親に
+			this.SearchPreviousDirectory(parent_directory.ToString());
+
+
+			/* 2016-04-12　つまった　保留　上の階層に遡って直前を探したい
+			DirectoryInfo parent_parent_directory = Directory.GetParent(parent_directory.ToString()); //ここは引数のディレクトリを指定
+			string[] parent_parent_directories = Directory.GetDirectories(
+				parent_parent_directory.ToString(),
+				"*",
+				System.IO.SearchOption.AllDirectories
+			);
+			Array.Sort(parent_parent_directories);
+
+			Debug.WriteLine("先頭 更に遡り必要");
+			Debug.WriteLine("-------------------------------------------------------------");
+			Debug.WriteLine(temp_dir);
+			Debug.WriteLine("-------------------------------------------------------------");
+			foreach(string now_dir in parent_parent_directories){
+				if(now_dir.Equals(temp_dir)){
+					Debug.WriteLine("★★★ " + now_dir);
+				}else{
+					Debug.WriteLine(now_dir);
+				}//if
+			}//foreach
+			Debug.WriteLine("-------------------------------------------------------------");
+
+			*/
+		}//if
+
+		string previous_directory = "";
+		foreach(string now_dir in parent_directories){
+			//今回のループが現在地だったら前のループの場所に移動
+			if(
+				(now_dir.Equals(this.path_image_directory))&&      //ここはフィールドのディレクトリ
+				(previous_directory.Equals(string.Empty) == false)
+			){
+				this.moveShowingDirectory(previous_directory);
+			}//if
+
+			//今回のループの分のディレクトリを保持
+			previous_directory = now_dir;
+		}//foreach
+
+	}//function
+
+
+
+	//////////////////////////////////
+	/**
+	 * 次のディレクトリに移動する
+	 * 
+	 */
+	private void SearchNextDirectory(){
+		//現在地よりも深い階層があればそこに入る
+		string first_child_dir = this.getFirstChildDir(this.path_image_directory);
+		if(first_child_dir != null){
+			//子階層がある
+			this.moveShowingDirectory(first_child_dir);
+			return;
+		}//if
+
+		//現在地と同じ階層に次のディレクトリがあればそこに入る
+		string next_brother_dir = this.getNextBrotherDir(this.path_image_directory);
+		if(next_brother_dir != null){
+			//弟階層がある
+			this.moveShowingDirectory(next_brother_dir);
+			return;
+		}//if
+
+		//現在地が同じ階層内での末尾だったら上の階層に移動する
+		string next_ancestor_dir = this.getNextAncestorDir(
+			this.path_image_directory
+		);
+		if(next_ancestor_dir != null){
+			this.moveShowingDirectory(next_ancestor_dir);
+			return;
+		}//if
+
+	}//function
+
+
+	//////////////////////////////////
+	/**
+	 * 子階層のひとつめを返す。
+	 * 自分が末端の階層の場合nullを返す。
+	 * 
+	 * @param  スタート地点のディレクトリパス
+	 * @return 子階層のパス / null
+	 */
+	private string getFirstChildDir(
+		string path
+	){
+		string first_child_path = null;
+
+		if(path.Equals(string.Empty) == false){
+			//引数のディレクトリ内に子ディレクトリがあるかどうか
+			string[] children_directories = Directory.GetDirectories(
+				path,
+				"*",
+				System.IO.SearchOption.TopDirectoryOnly
+			);
+			Array.Sort(children_directories);
+
+			if(children_directories.Length > 0){
+				//子ディレクトリあり
+				first_child_path = children_directories[0];
+			}//if
+		}//if
+
+		return first_child_path;
+	}//function
+
+
+	//////////////////////////////////
+	/**
+	 * 自分と同階層で、自分の次に位置するディレクトリを返す。
+	 * 自分が同階層の末席の場合nullを返す。
+	 * 
+	 * @param  スタート地点のディレクトリパス
+	 * @return 同階層の次のディレクトリのパス / null
+	 */
+	private string getNextBrotherDir(
+		string path
+	){
+		string next_brother_path = null;
+
+		if(path.Equals(string.Empty) == false){
+			//親ディレクトリ
+			DirectoryInfo parent_directory = Directory.GetParent(path);
+
+			//同世代ディレクトリ
+			string[] brothers_directories = Directory.GetDirectories(
+				parent_directory.ToString(),
+				"*",
+				System.IO.SearchOption.TopDirectoryOnly
+			);
+			Array.Sort(brothers_directories);
+
+			if(brothers_directories.Length > 0){
+				//同世代ディレクトリで先頭からループして自分の次の兄弟を見つける
+				bool is_self_passed = false;
+				foreach(string now_dir in brothers_directories){
+					if(now_dir.Equals(path)){
+						is_self_passed = true;
+						continue;
+					}//if
+					if(is_self_passed){
+						next_brother_path = now_dir;
+						break;
+					}//if
+				}//foreach
+			}//if
+		}//if
+
+		return next_brother_path;
+	}//function
+
+
+	//////////////////////////////////
+	/**
+	 * 階層を上に登って次のディレクトリを見つける。
+	 * 
+	 * 
+	 * @param  スタート地点のディレクトリパス
+	 * @return 見つかった・上の階層。
+	 */
+	private string getNextAncestorDir(
+		string path
+	){
+		string next_ancestor_path = null;
+
+		this.already_past_path_list.Add(next_ancestor_path);
+
+		if(path.Equals(string.Empty) == false){
+			//親ディレクトリ
+			DirectoryInfo parent_directory = Directory.GetParent(path);
+
+			//祖父ディレクトリ
+			DirectoryInfo grand_parent_directory = Directory.GetParent(parent_directory.ToString());
+
+			//親世代のディレクトリの配列 小階層まで軒並み取得する指定ではいけない
+			string[] parents_directories = Directory.GetDirectories(
+				grand_parent_directory.ToString(),
+				"*",
+				System.IO.SearchOption.TopDirectoryOnly
+			);
+			Array.Sort(parents_directories);
+
+			if(parents_directories.Length > 0){
+				//親世代ディレクトリで先頭からループして親の次の兄弟を見つける
+				bool is_self_passed = false;
+				foreach(string now_dir in parents_directories){
+					Debug.WriteLine("now_dir          : " + now_dir);
+					Debug.WriteLine("parent_directory : " + parent_directory.ToString());
+					if(now_dir.Equals(parent_directory.ToString())){
+						is_self_passed = true;
+						continue;
+					}//if
+					if(
+						(is_self_passed)&&
+						(already_past_path_list.Contains(now_dir) == false)
+					){
+						next_ancestor_path = now_dir;
+						break;
+					}//if
+				}//foreach
+
+				//ループで見つからない→親のパスを渡してこの処理を再帰的に呼ぶ
+				if(next_ancestor_path == null){
+					Debug.WriteLine("再帰的処理通過 入力パス : " + path);
+					next_ancestor_path = this.getNextAncestorDir(
+						parent_directory.ToString()
+					);
+				}//if
+			}//if
+		}//if
+
+		return next_ancestor_path;
+	}//function
+
+
+	//////////////////////////////////
+	/**
+	 * 画像表示ディレクトリを移動。
+	 * 
+	 * @param  ディレクトリパス
+	 */
+	private void moveShowingDirectory(
+		string dir_path_to_open
+	){
+		Debug.WriteLine("ディレクトリ移動通過 入力パス : " + dir_path_to_open);
+
+		//画像パスの配列を、ドラッグドロップされたファイルのディレクトリ内の画像一覧に更新
+		this.path_image_files = this.GetPathImageFiles(dir_path_to_open);
+
+		//表示ページ位置を先頭に
+		this.now_showing_images_order = 1;
+
+		//画像割り当て
+		this.ApplyImages(
+			this.path_image_files,
+			this.num_show_images,
+			this.now_showing_images_order
+		);
+
+		//現在地表示更新
+		this.path_image_directory = dir_path_to_open;
+		this.Text = this.path_image_directory;
 	}//function
 }//class

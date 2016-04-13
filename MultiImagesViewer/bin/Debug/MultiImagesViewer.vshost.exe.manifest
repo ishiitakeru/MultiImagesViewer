@@ -42,14 +42,14 @@
     </dependentAssembly>
   </dependency>
   <dependency>
-    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="MultiImagesViewer.exe" size="9704">
+    <dependentAssembly dependencyType="install" allowDelayedBinding="true" codebase="MultiImagesViewer.exe" size="11240">
       <assemblyIdentity name="MultiImagesViewer" version="0.0.0.0" language="neutral" processorArchitecture="msil" />
       <hash>
         <dsig:Transforms>
           <dsig:Transform Algorithm="urn:schemas-microsoft-com:HashTransforms.Identity" />
         </dsig:Transforms>
         <dsig:DigestMethod Algorithm="http://www.w3.org/2000/09/xmldsig#sha256" />
-        <dsig:DigestValue>ILv9s8LtNL1xdbKmePUt60mI0POH+uoGMqwLtVg7O2k=</dsig:DigestValue>
+        <dsig:DigestValue>ALKgZs3f7LUDEHX1ASpyLDDSJzFY6Yn2kCS5B4iji40=</dsig:DigestValue>
       </hash>
     </dependentAssembly>
   </dependency>
